@@ -1,1 +1,1 @@
-## A bitmask generator for scoped bit flags through enums.
+## A bitmask generator for enum scoped bit flags

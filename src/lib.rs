@@ -1,4 +1,4 @@
-//! A bitmask generator for scoped bit flags through enums.
+//! A bitmask generator for enum scoped bit flags.
 //!
 //! **Disclaimer:** For a more mature module check out [bitflags!](https://crates.io/crates/bitflags)!!
 //!
