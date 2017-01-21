@@ -8,13 +8,13 @@
 
 /// A macro that generates a bitmask and it's associated bit flags.
 ///
-/// The `bitmask!` macro creates a struct and an enum that hold your flags. The enum contains all the
+/// The `bitmask!` macro creates a struct and an enum that holds your flags. The enum contains all the
 /// bit flag variants and the struct is a mixture of those bit flags called a bitmask.
 /// It's syntax is as follows:
 ///
 /// ```ignore
 /// bitmask! {
-///     [pub] mask <struct_name>: <struct_type> where <enum_name> {
+///     [pub] mask <struct_name>: <struct_type> where flags <enum_name> {
 ///         <flag_name>: <value>,
 ///         ...
 ///     }
@@ -37,7 +37,7 @@
 /// ```
 /// # #[macro_use] extern crate bitmask; fn main() {
 /// bitmask! {
-///     mask BitMask: u32 where Flags {
+///     mask BitMask: u32 where flags Flags {
 ///         Flag1       = 0x00000001,
 ///         Flag2       = 0x000000F0,
 ///         Flag3       = 0x00000800,
@@ -46,9 +46,16 @@
 ///         // can't be used for enum discriminants in Rust.
 ///         FlagMax     = ::std::u32::MAX
 ///     }
-///     // This mask is to show that you can create multiple masks in a single macro invocation
-///     // as long as they have the same visibility (priv/pub).
-///     mask SomeOtherMask: isize where SomeOtherFlags {
+/// }
+///
+/// // You can add meta attributes like documentation (`#[doc = ""]`) to each element
+/// // of the generated code.
+/// bitmask! {
+///     /// Doc comment for the struct
+///     pub mask SomeOtherMask: isize where
+///     /// Doc comment for the enum
+///     flags SomeOtherFlags {
+///         /// Doc comment for the flag
 ///         FlagZero    = 0,
 ///         FlagOne     = 1
 ///     }
@@ -72,7 +79,7 @@
 /// ```
 /// # #[macro_use] extern crate bitmask; fn main() {
 /// bitmask! {
-///     mask Cake: u8 where Ingredients {
+///     mask Cake: u8 where flags Ingredients {
 ///         Sugar   = 0b00000001,
 ///         Eggs    = 0b00000010,
 ///         Flour   = 0b00000100,
@@ -84,97 +91,383 @@
 /// assert_eq!(*quality_cake, 0b00001111);
 /// # }
 /// ```
-// TODO: Add meta attributes when this error is gone
-// `local ambiguity: multiple parsing options: built-in NTs ident ('flag_name') or 1 other option.`
-// I have no idea why #[<meta>] can have local ambiguity with `ident`...
+// TODO: simplify the parsing when https://github.com/rust-lang/rust/issues/24189 is resolved
 #[macro_export]
 macro_rules! bitmask {
-    ($($(#[$st_attr: meta])* pub mask $st_name: ident : $T: tt where $en_name: ident {
-        $($flag_name: ident = $flag_val: expr),+
-    })*) => {
-        $(
-            #[repr($T)]
-            #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-            #[allow(dead_code)]
-            pub enum $en_name {
-                $($flag_name = $flag_val),+
-            }
-            #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-            #[allow(dead_code)]
-            $(#[$st_attr])*
-            pub struct $st_name {
-                mask: $T
-            }
-            bitmask!(@IMPL $st_name $T $en_name, {
-                $($flag_name = $flag_val),+
-            });
-        )*
+    // First stage (Struct)
+    //
+    // Parse struct meta attributes, its name and its type.
+    (
+        $(#[$st_attr: meta])* mask $st_name: ident : $T: tt where $($token: tt)+
+    ) => {
+        bitmask! {
+            st_meta: [ $(#[$st_attr])* ],
+            st_name: $st_name,
+            mask_type: $T,
+            $($token)+
+        }
     };
 
-    ($($(#[$st_attr: meta])* mask $st_name: ident : $T: tt where $en_name: ident {
-        $($flag_name: ident = $flag_val: expr),+
-    })*) => {
-        $(
-            #[repr($T)]
-            #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-            #[allow(dead_code)]
-            enum $en_name {
-                $($flag_name = $flag_val),+
-            }
-            #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-            #[allow(dead_code)]
-            $(#[$st_attr])*
-            struct $st_name {
-                mask: $T
-            }
-            bitmask!(@IMPL $st_name $T $en_name, {
-                $($flag_name = $flag_val),+
-            });
-        )*
+    // Second stage (Enum)
+    //
+    // Parse enum meta attributes and its name.
+    (
+        st_meta: [ $(#[$st_attr: meta])* ],
+        st_name: $st_name: ident,
+        mask_type: $T: tt,
+        $(#[$en_attr: meta])* flags $en_name: ident {  $($token: tt)+ }
+    ) => {
+        bitmask! {
+            st_meta: [ $(#[$st_attr])* ],
+            st_name: $st_name,
+            mask_type: $T,
+            en_meta: [ $(#[$en_attr])* ],
+            en_name: $en_name,
+            flags: [
+                []
+            ],
+            $($token)+
+        }
     };
 
-    ($($(#[$st_attr: meta])* pub mask $st_name: ident : $T: tt where $en_name: ident {
-        $($flag_name: ident = $flag_val: expr),+,
-    })*) => {
-        $(
-            #[repr($T)]
-            #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-            #[allow(dead_code)]
-            pub enum $en_name {
-                $($flag_name = $flag_val),+
-            }
-            #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-            #[allow(dead_code)]
-            $(#[$st_attr])*
-            pub struct $st_name {
-                mask: $T
-            }
-            bitmask!(@IMPL $st_name $T $en_name, {
-                $($flag_name = $flag_val),+
-            });
-        )*
+    // Third stage (Flag meta)
+    //
+    // Parse flag meta attributes.
+    (
+        st_meta: [ $(#[$st_attr: meta])* ],
+        st_name: $st_name: ident,
+        mask_type: $T: tt,
+        en_meta: [ $(#[$en_attr: meta])* ],
+        en_name: $en_name: ident,
+        flags: [
+            [ $(#[$prev_attr: meta])* ]
+            $(
+                [ $(#[$flag_attr: meta])* ]
+                $flag_name: ident = $flag_value: expr;
+            )*
+        ],
+        #[$next_attr: meta] $($token: tt)*
+    ) => {
+        bitmask! {
+            st_meta: [ $(#[$st_attr])* ],
+            st_name: $st_name,
+            mask_type: $T,
+            en_meta: [ $(#[$en_attr])* ],
+            en_name: $en_name,
+            flags: [
+                [ $(#[$prev_attr])* #[$next_attr] ]
+                $(
+                    [ $(#[$flag_attr])* ]
+                    $flag_name = $flag_value;
+                )*
+            ],
+            $($token)*
+        }
     };
 
-    ($($(#[$st_attr: meta])* mask $st_name: ident : $T: tt where $en_name: ident {
-        $($flag_name: ident = $flag_val: expr),+,
-    })*) => {
-        $(
-            #[repr($T)]
-            #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-            #[allow(dead_code)]
-            enum $en_name {
-                $($flag_name = $flag_val),+
-            }
-            #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-            #[allow(dead_code)]
-            $(#[$st_attr])*
-            struct $st_name {
-                mask: $T
-            }
-            bitmask!(@IMPL $st_name $T $en_name, {
-                $($flag_name = $flag_val),+
-            });
-        )*
+    // Fourth stage (Flag name and value)
+    //
+    // Parse the flag itself.
+    // Handles the case with trailing comma.
+    (
+        st_meta: [ $(#[$st_attr: meta])* ],
+        st_name: $st_name: ident,
+        mask_type: $T: tt,
+        en_meta: [ $(#[$en_attr: meta])* ],
+        en_name: $en_name: ident,
+        flags: [
+            [ $(#[$next_attr: meta])* ]
+            $(
+                [ $(#[$flag_attr: meta])* ]
+                $flag_name: ident = $flag_value: expr;
+            )*
+        ],
+        $next_name: ident = $next_value: expr, $($token: tt)*
+    ) => {
+        bitmask! {
+            st_meta: [ $(#[$st_attr])* ],
+            st_name: $st_name,
+            mask_type: $T,
+            en_meta: [ $(#[$en_attr])* ],
+            en_name: $en_name,
+            flags: [
+                []
+                [ $(#[$next_attr])* ]
+                $next_name = $next_value;
+                $(
+                    [ $(#[$flag_attr])* ]
+                    $flag_name = $flag_value;
+                )*
+            ],
+            $($token)*
+        }
+    };
+
+    // Fifth stage (Missing trailing comma)
+    //
+    // Parse the last flag if missing trailing comma.
+    (
+        st_meta: [ $(#[$st_attr: meta])* ],
+        st_name: $st_name: ident,
+        mask_type: $T: tt,
+        en_meta: [ $(#[$en_attr: meta])* ],
+        en_name: $en_name: ident,
+        flags: [
+            [ $(#[$next_attr: meta])* ]
+            $(
+                [ $(#[$flag_attr: meta])* ]
+                $flag_name: ident = $flag_value: expr;
+            )*
+        ],
+        $next_name: ident = $next_value: expr
+    ) => {
+        bitmask! {
+            st_meta: [ $(#[$st_attr])* ],
+            st_name: $st_name,
+            mask_type: $T,
+            en_meta: [ $(#[$en_attr])* ],
+            en_name: $en_name,
+            flags: [
+                []
+                [ $(#[$next_attr])* ]
+                $next_name = $next_value;
+                $(
+                    [ $(#[$flag_attr])* ]
+                    $flag_name = $flag_value;
+                )*
+            ],
+        }
+    };
+
+    // Sixth stage (EOL)
+    //
+    // End of the line. Time to declare the struct and enum.
+    (
+        st_meta: [ $(#[$st_attr: meta])* ],
+        st_name: $st_name: ident,
+        mask_type: $T: tt,
+        en_meta: [ $(#[$en_attr: meta])* ],
+        en_name: $en_name: ident,
+        flags: [
+            []
+            $(
+                [ $(#[$flag_attr: meta])* ]
+                $flag_name: ident = $flag_value: expr;
+            )+
+        ],
+    ) => {
+        #[repr($T)]
+        #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+        #[allow(dead_code)]
+        $(#[$en_attr])*
+        enum $en_name {
+            $(
+                $(#[$flag_attr])*
+                $flag_name = $flag_value
+            ),+
+        }
+        #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+        #[allow(dead_code)]
+        $(#[$st_attr])*
+        struct $st_name {
+            mask: $T
+        }
+        bitmask!(@IMPL $st_name $T $en_name, {
+            $($flag_name = $flag_value),+
+        });
+    };
+
+    // First pub stage (Struct)
+    //
+    // Parse struct meta attributes, its name and its type.
+    (
+        $(#[$st_attr: meta])* pub mask $st_name: ident : $T: tt where $($token: tt)+
+    ) => {
+        bitmask! {
+            pub
+            st_meta: [ $(#[$st_attr])* ],
+            st_name: $st_name,
+            mask_type: $T,
+            $($token)+
+        }
+    };
+
+    // Second pub stage (Enum)
+    //
+    // Parse enum meta attributes and its name.
+    (
+        pub
+        st_meta: [ $(#[$st_attr: meta])* ],
+        st_name: $st_name: ident,
+        mask_type: $T: tt,
+        $(#[$en_attr: meta])* flags $en_name: ident {  $($token: tt)+ }
+    ) => {
+        bitmask! {
+            pub
+            st_meta: [ $(#[$st_attr])* ],
+            st_name: $st_name,
+            mask_type: $T,
+            en_meta: [ $(#[$en_attr])* ],
+            en_name: $en_name,
+            flags: [
+                []
+            ],
+            $($token)+
+        }
+    };
+
+    // Third pub stage (Flag meta)
+    //
+    // Parse flag meta attributes.
+    (
+        pub
+        st_meta: [ $(#[$st_attr: meta])* ],
+        st_name: $st_name: ident,
+        mask_type: $T: tt,
+        en_meta: [ $(#[$en_attr: meta])* ],
+        en_name: $en_name: ident,
+        flags: [
+            [ $(#[$prev_attr: meta])* ]
+            $(
+                [ $(#[$flag_attr: meta])* ]
+                $flag_name: ident = $flag_value: expr;
+            )*
+        ],
+        #[$next_attr: meta] $($token: tt)*
+    ) => {
+        bitmask! {
+            pub
+            st_meta: [ $(#[$st_attr])* ],
+            st_name: $st_name,
+            mask_type: $T,
+            en_meta: [ $(#[$en_attr])* ],
+            en_name: $en_name,
+            flags: [
+                [ $(#[$prev_attr])* #[$next_attr] ]
+                $(
+                    [ $(#[$flag_attr])* ]
+                    $flag_name = $flag_value;
+                )*
+            ],
+            $($token)*
+        }
+    };
+
+    // Fourth pub stage (Flag name and value)
+    //
+    // Parse the flag itself.
+    // Handles the case with trailing comma.
+    (
+        pub
+        st_meta: [ $(#[$st_attr: meta])* ],
+        st_name: $st_name: ident,
+        mask_type: $T: tt,
+        en_meta: [ $(#[$en_attr: meta])* ],
+        en_name: $en_name: ident,
+        flags: [
+            [ $(#[$next_attr: meta])* ]
+            $(
+                [ $(#[$flag_attr: meta])* ]
+                $flag_name: ident = $flag_value: expr;
+            )*
+        ],
+        $next_name: ident = $next_value: expr, $($token: tt)*
+    ) => {
+        bitmask! {
+            pub
+            st_meta: [ $(#[$st_attr])* ],
+            st_name: $st_name,
+            mask_type: $T,
+            en_meta: [ $(#[$en_attr])* ],
+            en_name: $en_name,
+            flags: [
+                []
+                [ $(#[$next_attr])* ]
+                $next_name = $next_value;
+                $(
+                    [ $(#[$flag_attr])* ]
+                    $flag_name = $flag_value;
+                )*
+            ],
+            $($token)*
+        }
+    };
+
+    // Fifth pub stage (Missing trailing comma)
+    //
+    // Parse the last flag if missing trailing comma.
+    (
+        pub
+        st_meta: [ $(#[$st_attr: meta])* ],
+        st_name: $st_name: ident,
+        mask_type: $T: tt,
+        en_meta: [ $(#[$en_attr: meta])* ],
+        en_name: $en_name: ident,
+        flags: [
+            [ $(#[$next_attr: meta])* ]
+            $(
+                [ $(#[$flag_attr: meta])* ]
+                $flag_name: ident = $flag_value: expr;
+            )*
+        ],
+        $next_name: ident = $next_value: expr
+    ) => {
+        bitmask! {
+            pub
+            st_meta: [ $(#[$st_attr])* ],
+            st_name: $st_name,
+            mask_type: $T,
+            en_meta: [ $(#[$en_attr])* ],
+            en_name: $en_name,
+            flags: [
+                []
+                [ $(#[$next_attr])* ]
+                $next_name = $next_value;
+                $(
+                    [ $(#[$flag_attr])* ]
+                    $flag_name = $flag_value;
+                )*
+            ],
+        }
+    };
+
+    // Sixth pub stage (EOL)
+    //
+    // End of the line. Time to declare the struct and enum.
+    (
+        pub
+        st_meta: [ $(#[$st_attr: meta])* ],
+        st_name: $st_name: ident,
+        mask_type: $T: tt,
+        en_meta: [ $(#[$en_attr: meta])* ],
+        en_name: $en_name: ident,
+        flags: [
+            []
+            $(
+                [ $(#[$flag_attr: meta])* ]
+                $flag_name: ident = $flag_value: expr;
+            )+
+        ],
+    ) => {
+        #[repr($T)]
+        #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+        #[allow(dead_code)]
+        $(#[$en_attr])*
+        pub enum $en_name {
+            $(
+                $(#[$flag_attr])*
+                $flag_name = $flag_value
+            ),+
+        }
+        #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+        #[allow(dead_code)]
+        $(#[$st_attr])*
+        pub struct $st_name {
+            mask: $T
+        }
+        bitmask!(@IMPL $st_name $T $en_name, {
+            $($flag_name = $flag_value),+
+        });
     };
 
     (@IMPL $st_name: ident $T: tt $en_name: ident, {
@@ -408,20 +701,21 @@ macro_rules! bitmask {
 #[cfg(test)]
 mod tests {
     bitmask! {
-        mask BitMask: isize where Flags {
+        /// Doc comment
+        mask BitMask: isize where
+        /// Doc comment
+        flags Flags {
             Flag1      = 0b00000001,
+            /// Doc comment
             Flag2      = 0b00000010,
             Flag3      = 0b00000100,
             FlagMin    = ::std::isize::MIN,
+            /// Doc comment
             Flag123    = 0b00000111
-        }
-        /// Doc comment struct
-        mask U16: u16 where FlagsU16 {
-            F1 = 1
         }
     }
     bitmask! {
-        mask A: u8 where B {
+        mask A: u8 where flags B {
             Trailing = 1,
         }
     }
@@ -582,7 +876,7 @@ mod tests {
     fn test_pub_mask() {
         mod inner {
             bitmask! {
-                pub mask InnerMask: u8 where InnerFlags {
+                pub mask InnerMask: u8 where flags InnerFlags {
                     InnerFlag1 = 0
                 }
             }
