@@ -1,10 +1,11 @@
 [package]
 name = "bitmask"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Delyan Dobrev <delqn.dobrev@gmail.com>"]
 license = "MIT/Apache-2.0"
 readme = "README.md"
 description = "A bitmask generator for enum scoped bit flags."
+documentation = "https://docs.rs/bitmask"
 homepage = "https://github.com/d3lio/bitmask"
 repository = "https://github.com/d3lio/bitmask"
 

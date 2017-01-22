@@ -1,8 +1,6 @@
 //! A bitmask generator for enum scoped bit flags.
 //!
-//! **Disclaimer:** For a more mature module check out [bitflags!](https://crates.io/crates/bitflags)!!
-//!
-//! ---
+//! For a more mature crate be sure to check out [bitflags!](https://crates.io/crates/bitflags)!!
 //!
 //! With that out of the way lets check out what this baby can do!
 
@@ -15,7 +13,7 @@
 /// ```ignore
 /// bitmask! {
 ///     [pub] mask <struct_name>: <struct_type> where flags <enum_name> {
-///         <flag_name>: <value>,
+///         <flag_name> = <value>,
 ///         ...
 ///     }
 /// }
@@ -23,14 +21,72 @@
 ///
 /// where `struct_type` can be one of the primitive integer types (`i8-64`, `u8-64`, `isize`, `usize`).
 ///
+/// Sometimes you might want to wrap some lib that ports `C` or some other code through FFI
+/// which exposes numerous defines/constants as `const`. For example if you had this module:
+///
+/// ```ignore
+/// mod tex {
+///     ...
+///     pub const TEXTURE_2D: u32   = 1;
+///     pub const TEXTURE_3D: u32   = 2;
+///     pub const FLIP: u32         = 4;
+///     ...
+///     pub fn set_options(mask: u32) { ... }
+/// }
+/// ```
+///
+/// To avoid collisions you would use these through the mod scope like so:
+///
+/// ```ignore
+/// tex::set_options(tex::TEXTURE_2D | tex::FLIP);
+/// ```
+///
+/// But that does not guarantee you that you won't use values outside the enum set for these flags.
+/// For example you could do:
+///
+/// ```ignore
+/// set_options(4 | 5);
+/// ```
+///
+/// Which is bad for obvious reasons. Now imagine you had an enum to hold all of those flags and a
+/// common type that does not accept any types other than the enum variants and itself. This is exactly what
+/// `bitmask!` does for you! It generates an enum with the variants (flags) you supply and a struct that
+/// holds a mask composed of arbitrary amount of these variants. So now our example would look like this:
+///
+/// ```
+/// # mod tex {
+/// #     pub const TEXTURE_2D: u32   = 1;
+/// #     pub const TEXTURE_3D: u32   = 2;
+/// #     pub const FLIP: u32         = 4;
+/// #     pub fn set_options(mask: u32) {}
+/// # }
+/// # #[macro_use] extern crate bitmask; fn main() {
+/// bitmask! {
+///     pub mask TexMask: u32 where flags TexOption {
+///         Texture2d = tex::TEXTURE_2D,
+///         Texture3d = tex::TEXTURE_3D,
+///         Flip = tex::FLIP
+///     }
+/// }
+///
+/// fn set_options(mask: TexMask) {
+///     tex::set_options(*mask);
+/// }
+///
+/// set_options(TexOption::Texture2d | TexOption::Flip);
+/// # }
+/// ```
+///
+/// # Things that can change with time but are doable:
+///
 /// If for some reason you want to define the enum and the struct yourself you can do so and use the
 /// `@IMPL` branch of the macro to implement the methods. The only restrictions are that your
 /// struct's inner field must be named `mask` and the enum should have the same size as the struct
 /// which can be achieved through the `#[repr()]` modifier with the same integer type as the field `mask`.
 ///
-/// You can implement `Into<struct_name>` and `Deref` for your own custom type if you want to
-/// use it with the preimplemented methods for the mask but beware that this can change with time and
-/// does not apply for the trait impls like `BitOr` for example.
+/// You can also implement `Into<struct_name>` and `Deref` for your own custom type if you want to
+/// use it with the preimplemented methods for the mask but does not apply for the trait impls
+/// like `BitOr` for example and as stated **this can change** with time.
 ///
 /// # Examples:
 ///
@@ -48,8 +104,7 @@
 ///     }
 /// }
 ///
-/// // You can add meta attributes like documentation (`#[doc = ""]`) to each element
-/// // of the generated code.
+/// // You can add meta attributes like documentation (`#[doc = ""]`) to each element of the macro.
 /// bitmask! {
 ///     /// Doc comment for the struct
 ///     pub mask SomeOtherMask: isize where
@@ -74,7 +129,7 @@
 /// # }
 /// ```
 ///
-/// Maybe not the best example but still... I like caaaake
+/// Maybe not the best example but still... Cake is love!
 ///
 /// ```
 /// # #[macro_use] extern crate bitmask; fn main() {
@@ -140,11 +195,11 @@ macro_rules! bitmask {
         en_meta: [ $(#[$en_attr: meta])* ],
         en_name: $en_name: ident,
         flags: [
-            [ $(#[$prev_attr: meta])* ]
             $(
-                [ $(#[$flag_attr: meta])* ]
-                $flag_name: ident = $flag_value: expr;
+                meta: [ $(#[$flag_attr: meta])* ]
+                flag: $flag_name: ident = $flag_value: expr;
             )*
+            [ $(#[$prev_attr: meta])* ]
         ],
         #[$next_attr: meta] $($token: tt)*
     ) => {
@@ -155,11 +210,11 @@ macro_rules! bitmask {
             en_meta: [ $(#[$en_attr])* ],
             en_name: $en_name,
             flags: [
-                [ $(#[$prev_attr])* #[$next_attr] ]
                 $(
-                    [ $(#[$flag_attr])* ]
-                    $flag_name = $flag_value;
+                    meta: [ $(#[$flag_attr])* ]
+                    flag: $flag_name = $flag_value;
                 )*
+                [ $(#[$prev_attr])* #[$next_attr] ]
             ],
             $($token)*
         }
@@ -176,11 +231,11 @@ macro_rules! bitmask {
         en_meta: [ $(#[$en_attr: meta])* ],
         en_name: $en_name: ident,
         flags: [
-            [ $(#[$next_attr: meta])* ]
             $(
-                [ $(#[$flag_attr: meta])* ]
-                $flag_name: ident = $flag_value: expr;
+                meta: [ $(#[$flag_attr: meta])* ]
+                flag: $flag_name: ident = $flag_value: expr;
             )*
+            [ $(#[$next_attr: meta])* ]
         ],
         $next_name: ident = $next_value: expr, $($token: tt)*
     ) => {
@@ -191,13 +246,13 @@ macro_rules! bitmask {
             en_meta: [ $(#[$en_attr])* ],
             en_name: $en_name,
             flags: [
-                []
-                [ $(#[$next_attr])* ]
-                $next_name = $next_value;
                 $(
-                    [ $(#[$flag_attr])* ]
-                    $flag_name = $flag_value;
+                    meta: [ $(#[$flag_attr])* ]
+                    flag: $flag_name = $flag_value;
                 )*
+                meta: [ $(#[$next_attr])* ]
+                flag: $next_name = $next_value;
+                []
             ],
             $($token)*
         }
@@ -213,11 +268,11 @@ macro_rules! bitmask {
         en_meta: [ $(#[$en_attr: meta])* ],
         en_name: $en_name: ident,
         flags: [
-            [ $(#[$next_attr: meta])* ]
             $(
-                [ $(#[$flag_attr: meta])* ]
-                $flag_name: ident = $flag_value: expr;
+                meta: [ $(#[$flag_attr: meta])* ]
+                flag: $flag_name: ident = $flag_value: expr;
             )*
+            [ $(#[$next_attr: meta])* ]
         ],
         $next_name: ident = $next_value: expr
     ) => {
@@ -228,13 +283,13 @@ macro_rules! bitmask {
             en_meta: [ $(#[$en_attr])* ],
             en_name: $en_name,
             flags: [
-                []
-                [ $(#[$next_attr])* ]
-                $next_name = $next_value;
                 $(
-                    [ $(#[$flag_attr])* ]
-                    $flag_name = $flag_value;
+                    meta: [ $(#[$flag_attr])* ]
+                    flag: $flag_name = $flag_value;
                 )*
+                meta: [ $(#[$next_attr])* ]
+                flag: $next_name = $next_value;
+                []
             ],
         }
     };
@@ -249,11 +304,11 @@ macro_rules! bitmask {
         en_meta: [ $(#[$en_attr: meta])* ],
         en_name: $en_name: ident,
         flags: [
-            []
             $(
-                [ $(#[$flag_attr: meta])* ]
-                $flag_name: ident = $flag_value: expr;
+                meta: [ $(#[$flag_attr: meta])* ]
+                flag: $flag_name: ident = $flag_value: expr;
             )+
+            []
         ],
     ) => {
         #[repr($T)]
@@ -276,6 +331,8 @@ macro_rules! bitmask {
             $($flag_name = $flag_value),+
         });
     };
+
+    //========================================= PUB API ==========================================//
 
     // First pub stage (Struct)
     //
@@ -327,11 +384,11 @@ macro_rules! bitmask {
         en_meta: [ $(#[$en_attr: meta])* ],
         en_name: $en_name: ident,
         flags: [
-            [ $(#[$prev_attr: meta])* ]
             $(
-                [ $(#[$flag_attr: meta])* ]
-                $flag_name: ident = $flag_value: expr;
+                meta: [ $(#[$flag_attr: meta])* ]
+                flag: $flag_name: ident = $flag_value: expr;
             )*
+            [ $(#[$prev_attr: meta])* ]
         ],
         #[$next_attr: meta] $($token: tt)*
     ) => {
@@ -343,11 +400,11 @@ macro_rules! bitmask {
             en_meta: [ $(#[$en_attr])* ],
             en_name: $en_name,
             flags: [
-                [ $(#[$prev_attr])* #[$next_attr] ]
                 $(
-                    [ $(#[$flag_attr])* ]
-                    $flag_name = $flag_value;
+                    meta: [ $(#[$flag_attr])* ]
+                    flag: $flag_name = $flag_value;
                 )*
+                [ $(#[$prev_attr])* #[$next_attr] ]
             ],
             $($token)*
         }
@@ -365,11 +422,11 @@ macro_rules! bitmask {
         en_meta: [ $(#[$en_attr: meta])* ],
         en_name: $en_name: ident,
         flags: [
-            [ $(#[$next_attr: meta])* ]
             $(
-                [ $(#[$flag_attr: meta])* ]
-                $flag_name: ident = $flag_value: expr;
+                meta: [ $(#[$flag_attr: meta])* ]
+                flag: $flag_name: ident = $flag_value: expr;
             )*
+            [ $(#[$next_attr: meta])* ]
         ],
         $next_name: ident = $next_value: expr, $($token: tt)*
     ) => {
@@ -381,13 +438,13 @@ macro_rules! bitmask {
             en_meta: [ $(#[$en_attr])* ],
             en_name: $en_name,
             flags: [
-                []
-                [ $(#[$next_attr])* ]
-                $next_name = $next_value;
                 $(
-                    [ $(#[$flag_attr])* ]
-                    $flag_name = $flag_value;
+                    meta: [ $(#[$flag_attr])* ]
+                    flag: $flag_name = $flag_value;
                 )*
+                meta: [ $(#[$next_attr])* ]
+                flag: $next_name = $next_value;
+                []
             ],
             $($token)*
         }
@@ -404,11 +461,11 @@ macro_rules! bitmask {
         en_meta: [ $(#[$en_attr: meta])* ],
         en_name: $en_name: ident,
         flags: [
-            [ $(#[$next_attr: meta])* ]
             $(
-                [ $(#[$flag_attr: meta])* ]
-                $flag_name: ident = $flag_value: expr;
+                meta: [ $(#[$flag_attr: meta])* ]
+                flag: $flag_name: ident = $flag_value: expr;
             )*
+            [ $(#[$next_attr: meta])* ]
         ],
         $next_name: ident = $next_value: expr
     ) => {
@@ -420,13 +477,13 @@ macro_rules! bitmask {
             en_meta: [ $(#[$en_attr])* ],
             en_name: $en_name,
             flags: [
-                []
-                [ $(#[$next_attr])* ]
-                $next_name = $next_value;
                 $(
-                    [ $(#[$flag_attr])* ]
-                    $flag_name = $flag_value;
+                    meta: [ $(#[$flag_attr])* ]
+                    flag: $flag_name = $flag_value;
                 )*
+                meta: [ $(#[$next_attr])* ]
+                flag: $next_name = $next_value;
+                []
             ],
         }
     };
@@ -442,11 +499,11 @@ macro_rules! bitmask {
         en_meta: [ $(#[$en_attr: meta])* ],
         en_name: $en_name: ident,
         flags: [
-            []
             $(
-                [ $(#[$flag_attr: meta])* ]
-                $flag_name: ident = $flag_value: expr;
+                meta: [ $(#[$flag_attr: meta])* ]
+                flag: $flag_name: ident = $flag_value: expr;
             )+
+            []
         ],
     ) => {
         #[repr($T)]
