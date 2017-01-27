@@ -22,7 +22,7 @@
 /// where `struct_type` can be one of the primitive integer types (`i8-64`, `u8-64`, `isize`, `usize`).
 ///
 /// Sometimes you might want to wrap some lib that ports `C` or some other code through FFI
-/// which exposes numerous defines/constants as `const`. For example if you had this module:
+/// which exposes numerous defines/constants as `const`. Lets take a look at this example module:
 ///
 /// ```ignore
 /// mod tex {
@@ -73,6 +73,11 @@
 ///     tex::set_options(*mask);
 /// }
 ///
+/// // Single flag
+/// set_options(TexOption::Texture2d.into());
+/// set_options(TexMask::from(TexOption::Texture3d));
+///
+/// // Multiple flags
 /// set_options(TexOption::Texture2d | TexOption::Flip);
 /// # }
 /// ```
