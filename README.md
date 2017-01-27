@@ -10,7 +10,7 @@ Add `bitmask` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependency]
-bitmask = "0.2.0^"
+bitmask = "^0.2.0"
 ```
 
 Add this snippet to your crate's root:
