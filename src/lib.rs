@@ -1,10 +1,6 @@
 //! A bitmask generator for enum scoped bit flags.
-//!
-//! For a more mature crate be sure to check out [bitflags!](https://crates.io/crates/bitflags)!!
-//!
-//! With that out of the way lets check out what this baby can do!
 
-/// A macro that generates a bitmask and it's associated bit flags.
+/// Macro that generates a bitmask and it's associated bit flags.
 ///
 /// The `bitmask!` macro creates a struct and an enum that holds your flags. The enum contains all the
 /// bit flag variants and the struct is a mixture of those bit flags called a bitmask.
@@ -12,14 +8,17 @@
 ///
 /// ```ignore
 /// bitmask! {
-///     [pub] mask <struct_name>: <struct_type> where flags <enum_name> {
+///     pub mask <struct_name>: <struct_type> where flags <enum_name> {
 ///         <flag_name> = <value>,
 ///         ...
 ///     }
 /// }
 /// ```
 ///
-/// where `struct_type` can be one of the primitive integer types (`i8-64`, `u8-64`, `isize`, `usize`).
+/// where `pub` is optional and `struct_type` can be one of the primitive integer types
+/// (`i8-64`, `u8-64`, `isize`, `usize`).
+///
+/// # Application
 ///
 /// Sometimes you might want to wrap some lib that ports `C` or some other code through FFI
 /// which exposes numerous defines/constants as `const`. Lets take a look at this example module:
@@ -41,17 +40,17 @@
 /// tex::set_options(tex::TEXTURE_2D | tex::FLIP);
 /// ```
 ///
-/// But that does not guarantee you that you won't use values outside the enum set for these flags.
+/// But that does not guarantee you that you won't use invalid flag values.
 /// For example you could do:
 ///
 /// ```ignore
-/// set_options(4 | 5);
+/// set_options(3 | 8);
 /// ```
 ///
-/// Which is bad for obvious reasons. Now imagine you had an enum to hold all of those flags and a
-/// common type that does not accept any types other than the enum variants and itself. This is exactly what
-/// `bitmask!` does for you! It generates an enum with the variants (flags) you supply and a struct that
-/// holds a mask composed of arbitrary amount of these variants. So now our example would look like this:
+/// Now imagine you had an enum to hold all of those flags and a common type that does not accept
+/// any types other than the enum variants and itself. This is exactly what `bitmask!` does for you!
+/// It generates an enum with the variants (flags) you supply and a struct that
+/// holds a mask which is a mixture of these variants. So now our example would look like this:
 ///
 /// ```
 /// # mod tex {
@@ -82,16 +81,16 @@
 /// # }
 /// ```
 ///
-/// # Things that can change with time but are doable:
+/// # Things that _can change_ with time but are doable:
 ///
 /// If for some reason you want to define the enum and the struct yourself you can do so and use the
 /// `@IMPL` branch of the macro to implement the methods. The only restrictions are that your
 /// struct's inner field must be named `mask` and the enum should have the same size as the struct
 /// which can be achieved through the `#[repr()]` modifier with the same integer type as the field `mask`.
 ///
-/// You can also implement `Into<struct_name>` and `Deref` for your own custom type if you want to
-/// use it with the preimplemented methods for the mask but does not apply for the trait impls
-/// like `BitOr` for example and as stated **this can change** with time.
+/// Implementing `Into<struct_name>` and `Deref` for your own custom type is possible if you want to
+/// use it with the preimplemented methods for the mask but does not apply for the trait implements
+/// like `BitOr` for example.
 ///
 /// # Examples:
 ///
@@ -109,7 +108,23 @@
 ///     }
 /// }
 ///
-/// // You can add meta attributes like documentation (`#[doc = ""]`) to each element of the macro.
+/// let mut mask = BitMask::none();
+///
+/// mask.set(Flags::Flag1 | Flags::Flag2);
+/// assert_eq!(*mask, 0x000000F1);
+///
+/// mask.unset(Flags::Flag1);
+/// assert_eq!(*mask, 0x000000F0);
+///
+/// mask.set(Flags::Flag123);
+/// assert_eq!(*mask, 0x000008F1);
+/// # }
+/// ```
+///
+/// You can add meta attributes like documentation (`#[doc = "..."]`) to each element of the macro:
+///
+/// ```
+/// # #[macro_use] extern crate bitmask; fn main() {
 /// bitmask! {
 ///     /// Doc comment for the struct
 ///     pub mask SomeOtherMask: isize where
@@ -120,17 +135,6 @@
 ///         FlagOne     = 1
 ///     }
 /// }
-///
-/// let mut mask = BitMask::new();
-///
-/// mask.set(Flags::Flag1 | Flags::Flag2);
-/// assert_eq!(*mask, 0x000000F1);
-///
-/// mask.unset(Flags::Flag1);
-/// assert_eq!(*mask, 0x000000F0);
-///
-/// mask.set(Flags::Flag123);
-/// assert_eq!(*mask, 0x000008F1);
 /// # }
 /// ```
 ///
@@ -154,28 +158,10 @@
 // TODO: simplify the parsing when https://github.com/rust-lang/rust/issues/24189 is resolved
 #[macro_export]
 macro_rules! bitmask {
-    // First stage (Struct)
-    //
     // Parse struct meta attributes, its name and its type.
     (
-        $(#[$st_attr: meta])* mask $st_name: ident : $T: tt where $($token: tt)+
-    ) => {
-        bitmask! {
-            st_meta: [ $(#[$st_attr])* ],
-            st_name: $st_name,
-            mask_type: $T,
-            $($token)+
-        }
-    };
-
-    // Second stage (Enum)
-    //
-    // Parse enum meta attributes and its name.
-    (
-        st_meta: [ $(#[$st_attr: meta])* ],
-        st_name: $st_name: ident,
-        mask_type: $T: tt,
-        $(#[$en_attr: meta])* flags $en_name: ident {  $($token: tt)+ }
+        $(#[$st_attr: meta])* mask $st_name: ident : $T: tt where
+        $(#[$en_attr: meta])* flags $en_name: ident { $($token: tt)+ }
     ) => {
         bitmask! {
             st_meta: [ $(#[$st_attr])* ],
@@ -190,8 +176,6 @@ macro_rules! bitmask {
         }
     };
 
-    // Third stage (Flag meta)
-    //
     // Parse flag meta attributes.
     (
         st_meta: [ $(#[$st_attr: meta])* ],
@@ -225,8 +209,6 @@ macro_rules! bitmask {
         }
     };
 
-    // Fourth stage (Flag name and value)
-    //
     // Parse the flag itself.
     // Handles the case with trailing comma.
     (
@@ -263,8 +245,6 @@ macro_rules! bitmask {
         }
     };
 
-    // Fifth stage (Missing trailing comma)
-    //
     // Parse the last flag if missing trailing comma.
     (
         st_meta: [ $(#[$st_attr: meta])* ],
@@ -299,8 +279,6 @@ macro_rules! bitmask {
         }
     };
 
-    // Sixth stage (EOL)
-    //
     // End of the line. Time to declare the struct and enum.
     (
         st_meta: [ $(#[$st_attr: meta])* ],
@@ -337,32 +315,10 @@ macro_rules! bitmask {
         });
     };
 
-    //========================================= PUB API ==========================================//
-
-    // First pub stage (Struct)
-    //
     // Parse struct meta attributes, its name and its type.
     (
-        $(#[$st_attr: meta])* pub mask $st_name: ident : $T: tt where $($token: tt)+
-    ) => {
-        bitmask! {
-            pub
-            st_meta: [ $(#[$st_attr])* ],
-            st_name: $st_name,
-            mask_type: $T,
-            $($token)+
-        }
-    };
-
-    // Second pub stage (Enum)
-    //
-    // Parse enum meta attributes and its name.
-    (
-        pub
-        st_meta: [ $(#[$st_attr: meta])* ],
-        st_name: $st_name: ident,
-        mask_type: $T: tt,
-        $(#[$en_attr: meta])* flags $en_name: ident {  $($token: tt)+ }
+        $(#[$st_attr: meta])* pub mask $st_name: ident : $T: tt where
+        $(#[$en_attr: meta])* flags $en_name: ident { $($token: tt)+ }
     ) => {
         bitmask! {
             pub
@@ -378,8 +334,6 @@ macro_rules! bitmask {
         }
     };
 
-    // Third pub stage (Flag meta)
-    //
     // Parse flag meta attributes.
     (
         pub
@@ -415,8 +369,6 @@ macro_rules! bitmask {
         }
     };
 
-    // Fourth pub stage (Flag name and value)
-    //
     // Parse the flag itself.
     // Handles the case with trailing comma.
     (
@@ -455,8 +407,6 @@ macro_rules! bitmask {
         }
     };
 
-    // Fifth pub stage (Missing trailing comma)
-    //
     // Parse the last flag if missing trailing comma.
     (
         pub
@@ -493,8 +443,6 @@ macro_rules! bitmask {
         }
     };
 
-    // Sixth pub stage (EOL)
-    //
     // End of the line. Time to declare the struct and enum.
     (
         pub
@@ -539,7 +487,7 @@ macro_rules! bitmask {
         impl $st_name {
             /// Create a new mask with all flags unset.
             #[inline]
-            pub fn new() -> Self {
+            pub fn none() -> Self {
                 $st_name {
                     mask: 0
                 }
@@ -553,7 +501,7 @@ macro_rules! bitmask {
                 }
             }
 
-            /// Set all flags that `other` contains.
+            /// Set all `other` flags.
             ///
             /// `other` can be either a single flag or another mask.
             #[inline]
@@ -562,7 +510,7 @@ macro_rules! bitmask {
                     self.mask |= *other;
             }
 
-            /// Unset all flags that `other` contains.
+            /// Unset all `other` flags.
             ///
             /// `other` can be either a single flag or another mask.
             #[inline]
@@ -571,7 +519,7 @@ macro_rules! bitmask {
                     self.mask &= Self::all().mask ^ *other;
             }
 
-            /// Toggle all flags that `other` contains.
+            /// Toggle all `other` flags.
             ///
             /// `other` can be either a single flag or another mask.
             #[inline]
@@ -580,7 +528,7 @@ macro_rules! bitmask {
                     self.mask ^= *other;
             }
 
-            /// Check if the mask contains all flags that `other` contains.
+            /// Check if the mask contains all of `other`'s flags.
             ///
             /// `other` can be either a single flag or another mask.
             #[inline]
@@ -589,7 +537,7 @@ macro_rules! bitmask {
                     self.mask & *other == *other
             }
 
-            /// Toggle all flags that other contains.
+            /// Check if the mask has common flags with `other`.
             ///
             /// `other` can be either a single flag or another mask.
             #[inline]
@@ -785,7 +733,7 @@ mod tests {
 
     #[test]
     fn test_set_unset() {
-        let mut bm = BitMask::new();
+        let mut bm = BitMask::none();
         assert_eq!(*bm, 0b00000000);
         bm.set(Flag2);
         assert_eq!(*bm, Flag2 as isize);
@@ -799,7 +747,7 @@ mod tests {
 
     #[test]
     fn test_toggle() {
-        let mut bm = BitMask::new();
+        let mut bm = BitMask::none();
         bm.toggle(Flag2);
         assert_eq!(*bm, 0b00000010);
         bm.toggle(BitMask::from(Flag3));
@@ -834,7 +782,7 @@ mod tests {
     #[test]
     fn test_is_all() {
         assert_eq!(BitMask::all().is_all(), true);
-        assert_eq!(BitMask::new().is_all(), false);
+        assert_eq!(BitMask::none().is_all(), false);
         assert_eq!(BitMask::from(Flag1).is_all(), false);
         assert_eq!(BitMask::from(Flag123 | FlagMin).is_all(), true);
     }
@@ -842,7 +790,7 @@ mod tests {
      #[test]
     fn test_is_none() {
         assert_eq!(BitMask::all().is_none(), false);
-        assert_eq!(BitMask::new().is_none(), true);
+        assert_eq!(BitMask::none().is_none(), true);
         assert_eq!(BitMask::from(Flag1).is_none(), false);
         assert_eq!(BitMask::from(Flag123 | FlagMin).is_none(), false);
     }
@@ -943,7 +891,7 @@ mod tests {
                 }
             }
         }
-        let _ = inner::InnerMask::new();
+        let _ = inner::InnerMask::none();
         let _ = inner::InnerFlags::InnerFlag1;
     }
 }

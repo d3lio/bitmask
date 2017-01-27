@@ -10,7 +10,7 @@ Add `bitmask` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependency]
-bitmask = "^0.2.0"
+bitmask = "^0.3.0"
 ```
 
 Add this snippet to your crate's root:
@@ -20,6 +20,6 @@ Add this snippet to your crate's root:
 extern crate bitmask;
 ```
 
-## Other
+## Similar crates
 
-For a more mature crate be sure to check out [bitflags!](https://crates.io/crates/bitflags)
+[bitflags!](https://crates.io/crates/bitflags)
