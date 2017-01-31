@@ -13,13 +13,17 @@ Add `bitmask` as a dependency in your `Cargo.toml`:
 bitmask = "^0.3.0"
 ```
 
-Add this snippet to your crate's root:
+Then add this snippet to your crate's root:
 
 ```rust
 #[macro_use]
 extern crate bitmask;
 ```
 
+## Examples
+
+Run a specific example with `cargo run --example <name>`.
+
 ## Similar crates
 
-[bitflags!](https://crates.io/crates/bitflags)
+* [bitflags!](https://crates.io/crates/bitflags)

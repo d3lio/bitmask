@@ -81,7 +81,7 @@
 /// # }
 /// ```
 ///
-/// # Things that _can change_ with time but are doable:
+/// # Things that are doable but _can change_ with time:
 ///
 /// If for some reason you want to define the enum and the struct yourself you can do so and use the
 /// `@IMPL` branch of the macro to implement the methods. The only restrictions are that your
@@ -591,9 +591,7 @@ macro_rules! bitmask {
         }
 
         // TODO: when `concat_idents!` is stable, replace the `IMPL`s with a single impl on a common trait
-        // and use static dispatch. Right now using dispatch is out of the question because it would
-        // have the traits be implemented for all types that deref to `$T`. `T: Into + Deref`
-        // cannot be used in `impl` since the compiler thinks that's too generic.
+        // and use static dispatch. `T: Into + Deref` cannot be used in `impl` because that's too generic.
 
         bitmask! { @IMPL_BITOR
             $st_name, $st_name, $st_name;
