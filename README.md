@@ -10,7 +10,7 @@ Add `bitmask` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependency]
-bitmask = "^0.3.0"
+bitmask = "^0.5.0"
 ```
 
 Then add this snippet to your crate's root:
@@ -19,6 +19,13 @@ Then add this snippet to your crate's root:
 #[macro_use]
 extern crate bitmask;
 ```
+
+## Features
+
+Bitmask supports one feature: `std`. This is enabled by default, and will draw
+in the standard library and also automatically derive of `Hash` and `Debug` for
+generated types. If you prefer not to derive these features, then ensure you
+do not enable the default features.
 
 ## Examples
 
