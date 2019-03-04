@@ -154,7 +154,7 @@
 //! # }
 //! ```
 
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 // Re-export libcore using an alias so that the macro can work in `no_std` crates while remaining
 // compatible with normal crates
@@ -497,7 +497,8 @@ macro_rules! bitmask {
         ],
     ) => {
         #[repr($T)]
-        #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+        #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+        #[cfg_attr(feature = "std", derive(Debug, Hash))]
         #[allow(dead_code)]
         $(#[$en_attr])*
         pub enum $en_name {
@@ -506,7 +507,8 @@ macro_rules! bitmask {
                 $flag_name = $flag_value
             ),+
         }
-        #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+        #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+        #[cfg_attr(feature = "std", derive(Debug, Hash))]
         #[allow(dead_code)]
         $(#[$st_attr])*
         pub struct $st_name {
