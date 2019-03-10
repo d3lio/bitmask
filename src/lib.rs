@@ -332,7 +332,8 @@ macro_rules! bitmask {
         ],
     ) => {
         #[repr($T)]
-        #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+        #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+        #[cfg_attr(feature = "std", derive(Debug, Hash))]
         #[allow(dead_code)]
         $(#[$en_attr])*
         enum $en_name {
@@ -341,7 +342,8 @@ macro_rules! bitmask {
                 $flag_name = $flag_value
             ),+
         }
-        #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+        #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+        #[cfg_attr(feature = "std", derive(Debug, Hash))]
         #[allow(dead_code)]
         $(#[$st_attr])*
         struct $st_name {
